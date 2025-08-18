@@ -3,9 +3,12 @@ import os
 import json
 import scanpy as sc
 import anndata as ad
+import matplotlib.pyplot as plt
 
 # We need to adjust the import path to be relative to the multiverse package
 from .base import ModelFactory
+from ..config import load_config
+from ..train import load_datasets, dataset_select
 
 class PCA_Model(ModelFactory):
     """PCA implementation"""
@@ -33,17 +36,15 @@ class PCA_Model(ModelFactory):
         self.umap_random_state = pca_params.get("umap_random_state")
         self.umap_color_type = pca_params.get("umap_color_type")
 
-        # Output paths will be set by the runner
-        self.latent_filepath = None
-        self.umap_filename = None
-
-        print(f"PCA initialized with {self.dataset_name}, {self.n_components} components.")
+        print(
+            f"PCA initialized with {self.dataset_name}, {self.n_components} components."
+        )
 
     def to(self):
         """
         Method to set GPU or CPU mode.
         """
-        if self.device != 'cpu':
+        if self.device != "cpu":
             print("PCA does not support GPU. Using CPU instead.")
         else:
             print("Using CPU mode for PCA.")
@@ -53,10 +54,12 @@ class PCA_Model(ModelFactory):
         """Perform PCA on all modalities concatenated."""
         print("Training PCA Model")
 
-        if 'highly_variable' in self.dataset.var.keys():
+        if "highly_variable" in self.dataset.var.keys():
             sc.pp.pca(self.dataset, n_comps=self.n_components, use_highly_variable=True)
         else:
-            sc.pp.pca(self.dataset, n_comps=self.n_components, use_highly_variable=False)
+            sc.pp.pca(
+                self.dataset, n_comps=self.n_components, use_highly_variable=False
+            )
 
         self.latent = self.dataset.obsm["X_pca"]
         self.variance_ratio = self.dataset.uns["pca"]["variance_ratio"]
@@ -81,22 +84,27 @@ class PCA_Model(ModelFactory):
 
         print("Generating UMAP with PCA embeddings for all modalities")
 
-        sc.pp.neighbors(self.dataset, use_rep="X_pca", random_state=self.umap_random_state)
+        sc.pp.neighbors(
+            self.dataset, use_rep="X_pca", random_state=self.umap_random_state
+        )
         sc.tl.umap(self.dataset, random_state=self.umap_random_state)
 
         self.dataset.obsm["X_pca_umap"] = self.dataset.obsm["X_umap"].copy()
 
-        sc.settings.figdir = os.path.dirname(self.umap_filename)
-        filename = os.path.basename(self.umap_filename)
-
-        # Check if color type exists, otherwise plot without color
         if self.umap_color_type in self.dataset.obs:
-            sc.pl.umap(self.dataset, color=self.umap_color_type, save=filename)
+            sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
         else:
-            print(f"Warning: UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color.")
-            sc.pl.umap(self.dataset, save=filename)
+            print(
+                f"Warning: UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
+            )
+            sc.pl.umap(self.dataset, show=False)
 
-        print(f"UMAP plot for {self.model_name} {self.dataset_name} saved as umap{filename}")
+        plt.savefig(self.umap_filename, bbox_inches="tight")
+        plt.close()
+
+        print(
+            f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
+        )
 
     def evaluate_model(self):
         """
@@ -106,52 +114,58 @@ class PCA_Model(ModelFactory):
         if hasattr(self, "variance_ratio"):
             total_variance = sum(self.variance_ratio)
             print(f"Total Variance Explained: {total_variance}")
-            return total_variance
+            # Save metrics
+            metrics = {"total_variance": str(total_variance)}
+            with open(
+                self.metrics_filepath,
+                "w",
+            ) as f:
+                json.dump(metrics, f, indent=4)
         else:
             raise ValueError("PCA variance ratio not available in the model.")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Run PCA model")
-    parser.add_argument("--input_dir", type=str, required=True, help="Input directory containing data.h5ad")
-    parser.add_argument("--output_dir", type=str, required=True, help="Output directory to save results")
-    parser.add_argument("--config_path", type=str, default="/app/config_alldatasets.json", help="Path to the configuration file")
+    parser.add_argument(
+        "--config_path",
+        type=str,
+        default="/app/config_alldatasets.json",
+        help="Path to the configuration file",
+    )
     args = parser.parse_args()
 
-    # Create output directory if it doesn't exist
-    os.makedirs(args.output_dir, exist_ok=True)
+    config_path = args.config_path
+    config = load_config(config_path=config_path)
 
     # Define log file path
-    log_file = os.path.join(args.output_dir, "log.txt")
+    log_file = os.path.join(config["output_dir"], "log.txt")
+
+    # Create output directory if it doesn't exist
+    os.makedirs(config["output_dir"], exist_ok=True)
+
+    # Data information from config file
+    datasets = load_datasets(config_path)
+    data_concat = dataset_select(datasets_dict=datasets, data_type="concatenate")
 
     try:
-        # Load data
-        input_file = os.path.join(args.input_dir, "data.h5ad")
-        if not os.path.exists(input_file):
-            raise FileNotFoundError(f"Input file not found: {input_file}")
-        adata = sc.read_h5ad(input_file)
+        for dataset_name, data_dict in data_concat.items():
+            # Instantiate and run model
+            pca_model = PCA_Model(
+                dataset=data_dict,
+                dataset_name=dataset_name,
+                config_path=args.config_path,
+            )
+            # Run the model pipeline
+            pca_model.to()
+            pca_model.train()
+            pca_model.save_latent()
+            pca_model.umap()
+            pca_model.evaluate_model()
 
-        # Instantiate and run model
-        pca_model = PCA_Model(dataset=adata, dataset_name="pca_dataset", config_path=args.config_path)
-
-        # Set output paths
-        pca_model.output_dir = args.output_dir
-        pca_model.latent_filepath = os.path.join(args.output_dir, "embeddings.h5ad")
-        pca_model.umap_filename = os.path.join(args.output_dir, "umap.png")
-
-        # Run the model pipeline
-        pca_model.to()
-        pca_model.train()
-        pca_model.save_latent()
-        pca_model.umap()
-
-        # Save metrics
-        metrics = {"total_variance": pca_model.evaluate_model()}
-        with open(os.path.join(args.output_dir, "metrics.json"), "w") as f:
-            json.dump(metrics, f, indent=4)
-
-        # Write success log
-        with open(log_file, "w") as f:
-            f.write("PCA model run completed successfully.\n")
+            # Write success log
+            with open(log_file, "w") as f:
+                f.write("PCA model run completed successfully.\n")
 
     except Exception as e:
         # Write error log

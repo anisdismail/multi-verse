@@ -18,11 +18,8 @@ def main():
 
     for model in args.models:
         print(f"\n=== Running model: {model} ===")
-        model_output_dir = os.path.join(args.output, model)
-        os.makedirs(model_output_dir, exist_ok=True)
-
         try:
-            run_model_container(model, args.input, model_output_dir)
+            run_model_container(model, args.input, args.output)
             print(f"=== Model {model} finished successfully ===")
         except Exception as e:
             print(f"!!! Error running model {model}: {e} !!!")

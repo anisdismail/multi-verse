@@ -3,20 +3,20 @@
   "_run_gridsearch": false,
   "data": {
     "dataset_Pbmc10k": {
-      "data_path": "/media/gambino/students_workdir/thihanh/IBP/data",
+      "data_path": "/data/input/Pbmc10k",
       "rna": {
-        "file_name": "10x-Multiome-Pbmc10k-RNA.h5ad",
+        "file_name": "RNA.h5ad",
         "is_preprocessed": false,
         "annotation": "cell_type"
       },
       "atac": {
-        "file_name": "10x-Multiome-Pbmc10k-ATAC.h5ad",
+        "file_name": "ATAC.h5ad",
         "is_preprocessed": false,
         "annotation": "cell_type"
       }
     },
     "dataset_TEA": {
-      "data_path": "/media/gambino/students_workdir/thihanh/IBP/h5mu_file",
+      "data_path": "/data/input/teaseq",
       "rna": {
         "file_name": "GSM4949911_X061-AP0C1W1_leukopak_perm-cells_tea_fulldepth_cellranger-arc_filtered_feature_bc_matrix.h5",
         "is_preprocessed": false,
@@ -127,5 +127,6 @@
   },
   "training": {
     "device": "cpu"
-  }
+  },
+  "output_dir": "/data/output/"
 }

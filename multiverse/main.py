@@ -1,5 +1,5 @@
 import sys
-from train import Trainer
+from multiverse.train import Trainer
 from eval import Evaluator
 from config import load_config
 import torch
