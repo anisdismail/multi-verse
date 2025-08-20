@@ -14,6 +14,24 @@
         "is_preprocessed": false,
         "annotation": "cell_type"
       }
+    },
+    "dataset_TEA": {
+      "data_path": "/data/input/teaseq",
+      "rna": {
+        "file_name": "GSM4949911_X061-AP0C1W1_leukopak_perm-cells_tea_fulldepth_cellranger-arc_filtered_feature_bc_matrix.h5",
+        "is_preprocessed": false,
+        "annotation": null
+      },
+      "atac": {
+        "file_name": "GSM4949911_X061-AP0C1W1_leukopak_perm-cells_tea_fulldepth_cellranger-arc_filtered_feature_bc_matrix.h5",
+        "is_preprocessed": false,
+        "annotation": null
+      },
+      "adt": {
+        "file_name": "GSM4949911_tea_fulldepth_adt_counts.csv.gz",
+        "is_preprocessed": false,
+        "annotation": null
+      }
     }
   },
   "model": {
@@ -46,8 +64,8 @@
       "device": "cuda:0",
       "max_epochs": 500,
       "learning_rate": 0.0001,
+          "umap_random_state": 1,
       "umap_color_type": "cell_type",
-      "umap_random_state": 1,
       "grid_search_params": {
         "learning_rate": [
           0.01,
@@ -64,10 +82,10 @@
       "latent_dimensions": 15,
       "optimizer": "sgd",
       "umap_use_representation": "X_mowgli",
+          "umap_random_state": 1,
       "learning_rate": 0.01,
       "tol_inner": 1e-7,
-      "max_iter_inner": 10,
-      "umap_random_state": 1,
+      "max_iter_inner": 10000,
       "umap_color_type": "cell_type",
       "grid_search_params": {
         "learning_rate": [
@@ -75,17 +93,7 @@
           0.001
         ]
       }
-    },
-    "cobolt": {
-      "device": "cuda",
-      "latent_dimensions": 15,
-      "umap_use_representation": "X_cobolt",
-      "learning_rate": 0.005,
-      "num_epochs": 2,
-      "umap_random_state": 1,
-      "umap_color_type": "cell_type",
-      "grid_search_params": {}
-}
+    }
   },
   "preprocess_params": {
     "rna_filtering": {
@@ -116,7 +124,7 @@
     }
   },
   "training": {
-    "device": "gpu"
+    "device": "cpu"
   },
   "output_dir": "/data/outputs/"
 }
