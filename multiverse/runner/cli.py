@@ -1,7 +1,7 @@
 import argparse
 import os
 from .docker_runner import run_model_container
-from ..logging_utils import get_logger
+from ..logging_utils import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
@@ -12,12 +12,10 @@ def main():
     parser.add_argument("--output", required=True, help="Path to the output results directory")
     args = parser.parse_args()
 
+    setup_logging(args.output)
     logger.info(f"Running models: {args.models}")
     logger.info(f"Input directory: {args.input}")
     logger.info(f"Output directory: {args.output}")
-
-    # Create the base output directory if it doesn't exist
-    os.makedirs(args.output, exist_ok=True)
 
     for model in args.models:
         logger.info(f"Running model: {model}")

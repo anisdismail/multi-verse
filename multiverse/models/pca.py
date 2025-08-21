@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from .base import ModelFactory
 from ..config import load_config
 from ..train import load_datasets, dataset_select
-from ..logging_utils import get_logger
+from ..logging_utils import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
@@ -141,7 +141,7 @@ def main():
     args = parser.parse_args()
 
     config = load_config(config_path=args.config_path)
-    os.makedirs(config["output_dir"], exist_ok=True)
+    setup_logging(config["output_dir"])
 
     # Data information from config file
     datasets = load_datasets(args.config_path)
