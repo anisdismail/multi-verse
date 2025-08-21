@@ -1,5 +1,8 @@
 import docker
 import os
+from ..logging_utils import get_logger
+
+logger = get_logger(__name__)
 
 
 def run_model_container(
@@ -55,9 +58,9 @@ def run_model_container(
                 DeviceRequest(count=-1, capabilities=[["gpu"]])
             ]
         except Exception as e:
-            print(f"GPU support not available, running on CPU. ({e})")
+            logger.warning(f"GPU support not available, running on CPU. ({e})")
 
     container = client.containers.run(**run_kwargs)
 
     for log in container.logs(stream=True):
-        print(log.decode().strip())
+        logger.info(log.decode().strip())

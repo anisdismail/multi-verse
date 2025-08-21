@@ -12,12 +12,16 @@ import torch
 from .base import ModelFactory
 from ..config import load_config
 from ..train import load_datasets, dataset_select
+from ..logging_utils import get_logger
+from ..utils import get_device
 
-class Mowgli_Model(ModelFactory):
+logger = get_logger(__name__)
+
+class MowgliModel(ModelFactory):
     """Mowgli model implementation."""
 
     def __init__(self, dataset, dataset_name, config_path: str, is_gridsearch=False):
-        print("Initializing Mowgli Model")
+        logger.info("Initializing Mowgli Model")
 
         super().__init__(dataset, dataset_name, config_path=config_path,
                          model_name="mowgli", is_gridsearch=is_gridsearch)
@@ -38,25 +42,11 @@ class Mowgli_Model(ModelFactory):
         self.umap_random_state = mowgli_params.get("umap_random_state")
         self.loss = 0
         self.model = mowgli.models.MowgliModel(latent_dim=self.latent_dimensions)
-        print(f"Mowgli model initiated with {self.latent_dimensions} dimension.")
-
-    def to(self):
-        try:
-            if self.device != 'cpu':
-                if torch.cuda.is_available():
-                    print("GPU available")
-                    print(f"Moving Mowgli model to {self.device}")
-                    self.torch_device = torch.device(self.device)
-                else:
-                    print("GPU cuda not available. Mowgli model will run with cpu")
-            else:
-                print("Mowgli model will run with cpu. Recommend to use GPU for computational efficiency.")
-        except Exception as e:
-            print(f"Invalid device '{self.device}' specified. Use 'cpu' or 'gpu'.")
-            raise
+        self.torch_device = get_device(self.device)
+        logger.info(f"Mowgli model initiated with {self.latent_dimensions} dimension.")
 
     def train(self):
-        print("Training Mowgli Model")
+        logger.info("Training Mowgli Model")
         try:
             self.model.train(
                 self.dataset,
@@ -66,71 +56,82 @@ class Mowgli_Model(ModelFactory):
                 tol_inner=self.inner_tolerance,
                 max_iter_inner=self.max_inner_iteration
             )
-            self.dataset.obsm["X_mowgli"] = self.dataset.obsm["W_OT"]
+            self.dataset.obsm[self.latent_key] = self.dataset.obsm["W_OT"]
             self.loss = self.model.losses[-1]
-            print(f"Final training loss: {self.loss}")
+            logger.info(f"Final training loss: {self.loss}")
         except Exception as e:
-            print(f"Error during training: {e}")
+            logger.error(f"Error during training: {e}")
             raise
 
     def save_latent(self):
         if self.latent_filepath is None:
             raise ValueError("latent_filepath is not set. Cannot save latent data.")
         try:
-            print("Saving latent data")
-            adata = ad.AnnData(self.dataset.obsm['X_mowgli'], obs=self.dataset.obs)
+            logger.info("Saving latent data")
+            adata = ad.AnnData(self.dataset.obsm[self.latent_key], obs=self.dataset.obs)
             adata.write(self.latent_filepath)
-            print(f"Latent data saved to {self.latent_filepath}")
+            logger.info(f"Latent data saved to {self.latent_filepath}")
+        except IOError as e:
+            logger.error(f"Could not write latent file to {self.latent_filepath}: {e}")
+            raise
         except Exception as e:
-            print(f"Error saving latent data: {e}")
+            logger.error(f"An unexpected error occurred while saving latent data: {e}")
+            raise
 
     def umap(self):
         """Generate UMAP visualization using Mowgli embeddings for all modalities."""
         if self.umap_filename is None:
             raise ValueError("umap_filename is not set. Cannot save UMAP plot.")
 
-        print(f"Generating UMAP with {self.model_name} embeddings for all modalities")
-
-        sc.pp.neighbors(
-            self.dataset, use_rep="X_mowgli", random_state=self.umap_random_state
-        )
-
-        sc.tl.umap(self.dataset, random_state=self.umap_random_state)
-
-        self.dataset.obsm[f"X_{self.model_name}_umap"] = self.dataset.obsm[
-            "X_umap"
-        ].copy()
-
-        if self.umap_color_type in self.dataset.obs:
-            sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
-        else:
-            print(
-                f"Warning: UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
+        logger.info(f"Generating UMAP with {self.model_name} embeddings for all modalities")
+        try:
+            sc.pp.neighbors(
+                self.dataset, use_rep=self.latent_key, random_state=self.umap_random_state
             )
-            sc.pl.umap(self.dataset, show=False)
 
-        plt.savefig(self.umap_filename, bbox_inches="tight")
-        plt.close()
+            sc.tl.umap(self.dataset, random_state=self.umap_random_state)
 
-        print(
-            f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
-        )
+            self.dataset.obsm[f"X_{self.model_name}_umap"] = self.dataset.obsm[
+                "X_umap"
+            ].copy()
+
+            if self.umap_color_type in self.dataset.obs:
+                sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
+            else:
+                logger.warning(
+                    f"UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
+                )
+                sc.pl.umap(self.dataset, show=False)
+
+            plt.savefig(self.umap_filename, bbox_inches="tight")
+            plt.close()
+
+            logger.info(
+                f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
+            )
+        except Exception as e:
+            logger.error(f"An error occurred during UMAP generation: {e}")
+            raise
 
     def evaluate_model(self):
         if hasattr(self, "loss"):
-            print(f"Optimal Transport Loss (Mowgli): {self.loss}")
+            logger.info(f"Optimal Transport Loss (Mowgli): {self.loss}")
             metrics = {"ot_loss": -self.loss}
-            with open(
-                self.metrics_filepath,
-                "w",
-            ) as f:
-                json.dump(metrics, f, indent=4)
+            try:
+                with open(
+                    self.metrics_filepath,
+                    "w",
+                ) as f:
+                    json.dump(metrics, f, indent=4)
+            except IOError as e:
+                logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
+                raise
         else:
             raise ValueError("Loss not available in the model.")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run PCA model")
+    parser = argparse.ArgumentParser(description="Run Mowgli model")
     parser.add_argument(
         "--config_path",
         type=str,
@@ -139,44 +140,29 @@ def main():
     )
     args = parser.parse_args()
 
-    config_path = args.config_path
-    config = load_config(config_path=config_path)
-
-    # Define log file path
-    log_file = os.path.join(config["output_dir"], "log.txt")
-
-    # Create output directory if it doesn't exist
-    os.makedirs(config["output_dir"], exist_ok=True)
-
     # Data information from config file
-    datasets = load_datasets(config_path)
+    datasets = load_datasets(args.config_path)
     data_concat = dataset_select(datasets_dict=datasets, data_type="mudata")
 
     try:
         for dataset_name, data_dict in data_concat.items():
             # Instantiate and run model
-            model = Mowgli_Model(
+            model = MowgliModel(
                 dataset=data_dict,
                 dataset_name=dataset_name,
                 config_path=args.config_path,
             )
-            print(f"Running Mowgli model on dataset: {dataset_name}")
+            logger.info(f"Running Mowgli model on dataset: {dataset_name}")
             # Run the model pipeline
-            model.to()
             model.train()
             model.save_latent()
             model.umap()
             model.evaluate_model()
 
-            # Write success log
-            with open(log_file, "w") as f:
-                f.write("Mowgli model run completed successfully.\n")
+            logger.info(f"Mowgli model run for {dataset_name} completed successfully.")
 
     except Exception as e:
-        # Write error log
-        with open(log_file, "w") as f:
-            f.write(f"An error occurred: {e}\n")
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred during Mowgli model run: {e}")
         # Optionally, re-raise the exception to indicate failure to the container runner
         raise
 

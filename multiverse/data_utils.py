@@ -3,6 +3,9 @@ import mudata as md
 import muon as mu
 import numpy as np
 from typing import List
+from .logging_utils import get_logger
+
+logger = get_logger(__name__)
 
 def fuse_mudata(list_anndata: List[ad.AnnData] = None, list_modality: List[str] = None) -> md.MuData:
     """
@@ -22,7 +25,7 @@ def fuse_mudata(list_anndata: List[ad.AnnData] = None, list_modality: List[str] 
             data_dict[mod] = list_anndata[i]
             try:
                 list_anndata[i].X = np.array(list_anndata[i].X.todense())
-            except:
+            except AttributeError:
                 pass
 
     data = mu.MuData(data_dict)
@@ -33,7 +36,7 @@ def fuse_mudata(list_anndata: List[ad.AnnData] = None, list_modality: List[str] 
         data.obs["cell_type"] = data["rna"].obs["cell_type"]
     else:
         # If there is no 'cell_type' annotation in rna modality
-        print("No annotation -> setting annotation as 'cell_type' = 0 to avoid conflicts.")
+        logger.warning("No 'cell_type' annotation found in rna modality. Creating a default 'cell_type' column with zeros.")
         num_obs = data.n_obs
         data.obs["cell_type"] = np.zeros(num_obs, dtype=int)
 
