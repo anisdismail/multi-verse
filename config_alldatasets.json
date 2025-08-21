@@ -32,7 +32,7 @@
     "mofa": {
       "device": "cuda:0",
       "n_factors": 20,
-      "n_iteration": 1000,
+      "n_iterations": 3,
       "umap_random_state": 1,
       "umap_color_type": "cell_type",
       "grid_search_params": {
@@ -44,7 +44,7 @@
     },
     "multivi": {
       "device": "cuda:0",
-      "max_epochs": 500,
+      "max_epochs": 10,
       "learning_rate": 0.0001,
       "umap_color_type": "cell_type",
       "umap_random_state": 1,

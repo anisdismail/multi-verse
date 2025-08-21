@@ -6,6 +6,9 @@ import anndata as ad
 import scvi
 import pandas as pd
 from sklearn.metrics import silhouette_score
+import matplotlib.pyplot as plt
+from ..config import load_config
+from ..train import load_datasets, dataset_select
 
 from .base import ModelFactory
 
@@ -26,15 +29,10 @@ class MultiVI_Model(ModelFactory):
         self.device = multivi_params.get("device")
         self.max_epochs = multivi_params.get("max_epochs")
         self.learning_rate = multivi_params.get("learning_rate")
-        self.latent_key = "X_multivi"
         self.umap_color_type = multivi_params.get("umap_color_type")
-
-        if self.umap_color_type not in self.dataset.obs:
-            print(f"Warning: '{self.umap_color_type}' not found in dataset. Defaulting to None for coloring.")
-            self.umap_color_type = None
-
-        self.latent_filepath = None
-        self.umap_filename = None
+        self.torch_device = "cpu"
+        self.latent_dimensions = multivi_params.get("latent_dimensions")
+        self.umap_random_state = multivi_params.get("umap_random_state")
 
         if "feature_types" in self.dataset.var.keys():
             try:
@@ -78,7 +76,7 @@ class MultiVI_Model(ModelFactory):
         try:
             self.to()
             self.model.train()
-            self.dataset.obsm[self.latent_key] = self.model.get_latent_representation()
+            self.dataset.obsm["X_multivi"] = self.model.get_latent_representation()
             print(f"Multivi training completed.")
         except Exception as e:
             print(f"Error during training: {e}")
@@ -87,9 +85,8 @@ class MultiVI_Model(ModelFactory):
     def save_latent(self):
         if self.latent_filepath is None:
             raise ValueError("latent_filepath is not set. Cannot save latent data.")
-        print("Saving latent data")
         try:
-            self.dataset.obsm[self.latent_key] = self.model.get_latent_representation()
+            print("Saving latent data")
             self.dataset.obs["batch"] = "batch_1"
             self.dataset.write(self.latent_filepath)
             print(f"MultiVI model for dataset {self.dataset_name} was saved as {self.latent_filepath}")
@@ -99,17 +96,30 @@ class MultiVI_Model(ModelFactory):
     def umap(self):
         if self.umap_filename is None:
             raise ValueError("umap_filename is not set. Cannot save UMAP plot.")
-        print("Generating UMAP plot")
+
+        print(f"Generating UMAP with {self.model_name} embeddings for all modalities")
         try:
-            sc.settings.figdir = os.path.dirname(self.umap_filename)
-            filename = os.path.basename(self.umap_filename)
-            sc.pp.neighbors(self.dataset, use_rep=self.latent_key, random_state=1)
-            sc.tl.umap(self.dataset, random_state=1)
+            sc.pp.neighbors(
+                self.dataset, use_rep="X_multivi", random_state=self.umap_random_state
+            )
+            sc.tl.umap(self.dataset, random_state=self.umap_random_state)
+            self.dataset.obsm[f"X_{self.model_name}_umap"] = self.dataset.obsm[
+                "X_umap"
+            ].copy()
             if self.umap_color_type in self.dataset.obs:
-                sc.pl.umap(self.dataset, color=self.umap_color_type, save=filename)
+                sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
             else:
-                sc.pl.umap(self.dataset, save=filename)
-            print(f"A UMAP plot for MultiVI model with dataset {self.dataset_name} was succesfully generated and saved as umap{filename}")
+                print(
+                    f"Warning: UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
+                )
+                sc.pl.umap(self.dataset, show=False)
+
+            plt.savefig(self.umap_filename, bbox_inches="tight")
+            plt.close()
+
+            print(
+                f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
+            )
         except Exception as e:
             print(f"Error generating UMAP: {e}")
 
@@ -120,51 +130,63 @@ class MultiVI_Model(ModelFactory):
                 labels = self.dataset.obs[self.umap_color_type]
                 silhouette = silhouette_score(latent, labels)
                 print(f"Silhouette Score (MultiVI): {silhouette}")
-                return silhouette
+                metrics = {"silhouette_score": silhouette}
+                with open(
+                    self.metrics_filepath,
+                    "w",
+                ) as f:
+                    json.dump(metrics, f, indent=4)
+
             else:
                 print("Labels not found for clustering evaluation. Returning 0.0")
-                return 0.0
+                return
         else:
             raise ValueError("Latent representation (X_multivi) not found.")
 
 def main():
     parser = argparse.ArgumentParser(description="Run MultiVI model")
-    parser.add_argument("--input_dir", type=str, required=True, help="Input directory containing data.h5ad")
-    parser.add_argument("--output_dir", type=str, required=True, help="Output directory to save results")
     parser.add_argument("--config_path", type=str, default="/app/config_alldatasets.json", help="Path to the configuration file")
     args = parser.parse_args()
 
-    os.makedirs(args.output_dir, exist_ok=True)
-    log_file = os.path.join(args.output_dir, "log.txt")
+    config_path = args.config_path
+    config = load_config(config_path=config_path)
+
+    # Define log file path
+    log_file = os.path.join(config["output_dir"], "log.txt")
+
+    # Create output directory if it doesn't exist
+    os.makedirs(config["output_dir"], exist_ok=True)
+
+    # Data information from config file
+    datasets = load_datasets(config_path)
+    data_concat = dataset_select(datasets_dict=datasets, data_type="concatenate")
 
     try:
-        input_file = os.path.join(args.input_dir, "data.h5ad")
-        if not os.path.exists(input_file):
-            raise FileNotFoundError(f"Input file not found: {input_file}")
-        adata = sc.read_h5ad(input_file)
+        for dataset_name, data_dict in data_concat.items():
+            # Instantiate and run model
+            model = MultiVI_Model(
+                dataset=data_dict,
+                dataset_name=dataset_name,
+                config_path=args.config_path,
+            )
+            print(f"Running MultiVI model on dataset: {dataset_name}")
+            # Run the model pipeline
+            model.to()
+            model.train()
+            model.save_latent()
+            model.umap()
+            model.evaluate_model()
 
-        model = MultiVI_Model(dataset=adata, dataset_name="multivi_dataset", config_path=args.config_path)
-
-        model.output_dir = args.output_dir
-        model.latent_filepath = os.path.join(args.output_dir, "embeddings.h5ad")
-        model.umap_filename = os.path.join(args.output_dir, "umap.png")
-
-        model.train()
-        model.save_latent()
-        model.umap()
-
-        score = model.evaluate_model()
-        metrics = {"silhouette_score": score}
-        with open(os.path.join(args.output_dir, "metrics.json"), "w") as f:
-            json.dump(metrics, f, indent=4)
-
-        with open(log_file, "w") as f:
-            f.write("MultiVI model run completed successfully.\n")
+            # Write success log
+            with open(log_file, "w") as f:
+                f.write("Mowgli model run completed successfully.\n")
 
     except Exception as e:
+        # Write error log
         with open(log_file, "w") as f:
             f.write(f"An error occurred: {e}\n")
         print(f"An error occurred: {e}")
+        # Optionally, re-raise the exception to indicate failure to the container runner
         raise
 
 if __name__ == "__main__":
