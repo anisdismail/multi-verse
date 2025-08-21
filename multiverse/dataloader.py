@@ -171,7 +171,12 @@ class Preprocessing:
         sc.pp.log1p(self.data)
 
         # Feature selection
-        sc.pp.highly_variable_genes(self.data, n_top_genes=rna_dict.get("n_top_genes"), subset=True,flavor="seurat_v3")
+        sc.pp.highly_variable_genes(
+            self.data,
+            n_top_genes=rna_dict.get("n_top_genes"),
+            subset=True,
+            flavor="seurat",
+        )
 
         return self.data
 
@@ -201,7 +206,12 @@ class Preprocessing:
         sc.pp.log1p(self.data)
 
         # Feature selection
-        sc.pp.highly_variable_genes(self.data, n_top_genes=atac_dict.get("n_top_peaks"), subset=True,flavor="seurat_v3")
+        sc.pp.highly_variable_genes(
+            self.data,
+            n_top_genes=atac_dict.get("n_top_peaks"),
+            subset=True,
+            flavor="seurat",
+        )
 
         return self.data
 

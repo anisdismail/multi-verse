@@ -14,7 +14,7 @@ from .base import ModelFactory
 from ..config import load_config
 from ..train import load_datasets
 from ..data_utils import fuse_mudata
-from ..logging_utils import get_logger
+from ..logging_utils import get_logger, setup_logging
 from ..utils import get_device
 
 logger = get_logger(__name__)

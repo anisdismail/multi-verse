@@ -116,7 +116,7 @@ class MowgliModel(ModelFactory):
     def evaluate_model(self):
         if hasattr(self, "loss"):
             logger.info(f"Optimal Transport Loss (Mowgli): {self.loss}")
-            metrics = {"ot_loss": -self.loss}
+            metrics = {"ot_loss": str(-self.loss)}
             try:
                 with open(
                     self.metrics_filepath,

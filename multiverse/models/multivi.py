@@ -9,7 +9,7 @@ from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 from ..config import load_config
 from ..train import load_datasets, dataset_select
-from ..logging_utils import get_logger
+from ..logging_utils import get_logger, setup_logging
 from ..utils import get_device
 
 from .base import ModelFactory
@@ -67,7 +67,6 @@ class MultiVIModel(ModelFactory):
     def train(self):
         logger.info("Training MultiVI Model")
         try:
-            self.model.to(self.torch_device)
             self.model.train()
             self.dataset.obsm[self.latent_key] = self.model.get_latent_representation()
             logger.info(f"Multivi training completed.")
