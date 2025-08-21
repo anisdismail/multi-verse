@@ -53,6 +53,10 @@ class ModelFactory:
             model_specific_params = self.model_params.get(self.model_name)
             self.umap_color_type = model_specific_params.get("umap_color_type")
 
+        if self.model_name in self.model_params:
+            model_specific_params = self.model_params.get(self.model_name)
+            self.umap_color_type = model_specific_params.get("umap_color_type")
+
 
     """def update_output_dir(self):
         if self.is_grid_search:
@@ -121,6 +125,12 @@ class ModelFactory:
 
         bm.benchmark()
         results_df = bm.get_results(min_max_scale=False)
-        if not results_df.empty:
-            return results_df.to_dict('records')[0]
-        return {}
+        results_dict = results_df.to_dict()
+
+        try:
+            with open(self.metrics_filepath, "w") as f:
+                json.dump(results_dict, f, indent=4)
+            logger.info(f"Metrics saved to {self.metrics_filepath}")
+        except IOError as e:
+            logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
+            raise
