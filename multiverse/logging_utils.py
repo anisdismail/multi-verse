@@ -6,8 +6,6 @@ def setup_logging(log_dir: str, log_level=logging.INFO):
     Configures the root logger to write to a file.
     """
     log_file = os.path.join(log_dir, "multiverse.log")
-    # Make sure the directory exists
-    os.makedirs(log_dir, exist_ok=True)
 
     # Get the root logger
     root_logger = logging.getLogger()

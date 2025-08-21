@@ -175,6 +175,7 @@ def main():
     args = parser.parse_args()
 
     config = load_config(config_path=args.config_path)
+    os.makedirs(config["output_dir"], exist_ok=True)
     setup_logging(config["output_dir"])
 
     # Data information from config file

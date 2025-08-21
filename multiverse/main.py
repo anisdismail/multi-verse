@@ -23,6 +23,7 @@ def main():
     # Pass the configuration path to the classes
     config_path = sys.argv[1]
     config = load_config(config_path)
+    os.makedirs(config["output_dir"], exist_ok=True)
     setup_logging(config["output_dir"])
     run_user_params = config.get("_run_user_params", True)
     # trainer = Trainer(config)
