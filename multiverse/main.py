@@ -1,8 +1,8 @@
 import sys
-from multiverse.logging_utils import get_logger
+from multiverse.logging_utils import get_logger, setup_logging
 # from multiverse.train import Trainer
 # from eval import Evaluator
-from .config import load_config
+from multiverse.config import load_config
 import torch
 torch.cuda.is_available()
 
@@ -23,6 +23,7 @@ def main():
     # Pass the configuration path to the classes
     config_path = sys.argv[1]
     config = load_config(config_path)
+    setup_logging(config["output_dir"])
     run_user_params = config.get("_run_user_params", True)
     # trainer = Trainer(config)
 

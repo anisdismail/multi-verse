@@ -1,17 +1,32 @@
 import logging
-import sys
+import os
 
-def get_logger(name: str, level=logging.INFO):
+def setup_logging(log_dir: str, log_level=logging.INFO):
     """
-    Returns a configured logger.
+    Configures the root logger to write to a file.
     """
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        logger.setLevel(level)
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    return logger
+    log_file = os.path.join(log_dir, "multiverse.log")
+    # Make sure the directory exists
+    os.makedirs(log_dir, exist_ok=True)
+
+    # Get the root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+
+    # Remove existing handlers to avoid duplicate logs
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    # Create file handler
+    file_handler = logging.FileHandler(log_file, mode='a') # Append mode
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    file_handler.setFormatter(formatter)
+    root_logger.addHandler(file_handler)
+
+def get_logger(name: str):
+    """
+    Returns a logger instance.
+    """
+    return logging.getLogger(name)
