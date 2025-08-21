@@ -9,6 +9,7 @@ import numpy as np
 from ..config import load_config
 from ..train import load_datasets, dataset_select
 from ..logging_utils import get_logger
+from ..utils import get_device
 
 from .base import ModelFactory
 
@@ -31,10 +32,11 @@ class MOFAModel(ModelFactory):
         self.device = mofa_params.get("device")
         self.n_iterations = mofa_params.get("n_iterations")
         self.umap_color_type = mofa_params.get("umap_color_type")
-        self.torch_device = "cpu"
         self.n_factors = mofa_params.get("n_factors")
         self.umap_random_state = mofa_params.get("umap_random_state")
-        self.gpu_mode = self.device != "cpu"
+
+        torch_device = get_device(self.device)
+        self.gpu_mode = torch_device.type != 'cpu'
 
     def train(self):
         """
