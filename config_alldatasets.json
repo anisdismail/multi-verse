@@ -85,7 +85,25 @@
       "umap_random_state": 1,
       "umap_color_type": "cell_type",
       "grid_search_params": {}
-}
+    },
+    "totalvi": {
+      "device": "cuda:0",
+      "max_epochs": 10,
+      "learning_rate": 0.0001,
+      "latent_dimensions": 10,
+      "umap_color_type": "cell_type",
+      "umap_random_state": 1,
+      "grid_search_params": {
+        "learning_rate": [
+          0.01,
+          0.001
+        ],
+        "max_epochs": [
+          100,
+          300
+        ]
+      }
+    }
   },
   "preprocess_params": {
     "rna_filtering": {

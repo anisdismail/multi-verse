@@ -11,3 +11,4 @@ xgboost
 pandas
 seaborn
 leidenalg
+scib-metrics

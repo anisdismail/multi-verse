@@ -16,61 +16,44 @@ from .base import ModelFactory
 
 logger = get_logger(__name__)
 
-class MultiVIModel(ModelFactory):
-    """MultiVI Model implementation."""
+class TotalVIModel(ModelFactory):
+    """TotalVI Model implementation."""
 
     def __init__(self, dataset: ad.AnnData, dataset_name, config_path: str, is_gridsearch=False):
-        logger.info("Initializing MultiVI Model")
+        logger.info("Initializing TotalVI Model")
 
         super().__init__(dataset, dataset_name, config_path=config_path,
-                         model_name="multivi", is_gridsearch=is_gridsearch)
+                         model_name="totalvi", is_gridsearch=is_gridsearch)
 
         if self.model_name not in self.model_params:
             raise ValueError(f"'{self.model_name}' configuration not found in the model parameters.")
 
-        multivi_params= self.model_params.get(self.model_name)
+        totalvi_params = self.model_params.get(self.model_name)
 
-        self.device = multivi_params.get("device")
-        self.max_epochs = multivi_params.get("max_epochs")
-        self.learning_rate = multivi_params.get("learning_rate")
-        self.umap_color_type = multivi_params.get("umap_color_type")
+        self.device = totalvi_params.get("device")
+        self.max_epochs = totalvi_params.get("max_epochs")
+        self.learning_rate = totalvi_params.get("learning_rate")
+        self.umap_color_type = totalvi_params.get("umap_color_type")
         self.torch_device = "cpu"
-        self.latent_dimensions = multivi_params.get("latent_dimensions")
-        self.umap_random_state = multivi_params.get("umap_random_state")
+        self.latent_dimensions = totalvi_params.get("latent_dimensions")
+        self.umap_random_state = totalvi_params.get("umap_random_state")
         self.torch_device = get_device(self.device)
 
-        if "feature_types" in self.dataset.var.keys():
-            try:
-                self.dataset = self.dataset[:, self.dataset.var["feature_types"].argsort()].copy()
-                if "Protein Expression" in self.dataset.var["feature_types"].unique():
-                    protein_indices = self.dataset.var["feature_types"] == "protein expression"
-                    protein_expression = self.dataset.X[:, protein_indices]
-                    protein_names = self.dataset.var_names[protein_indices]
-                    protein_expression_df = pd.DataFrame(protein_expression,
-                                     index=self.dataset.obs_names,
-                                     columns=protein_names)
-                    self.dataset.obsm["protein_expression"] = protein_expression_df
-                    scvi.model.MULTIVI.setup_anndata(self.dataset, protein_expression_obsm_key="protein_expression")
-                else:
-                    scvi.model.MULTIVI.setup_anndata(self.dataset, protein_expression_obsm_key=None)
+        scvi.model.TOTALVI.setup_anndata(
+            self.dataset,
+            protein_expression_obsm_key="protein_expression",
+            batch_key="batch"
+        )
 
-                self.model = scvi.model.MULTIVI(self.dataset,
-                                                n_genes=(self.dataset.var["feature_types"] == "Gene Expression").sum(),
-                                                n_regions=(self.dataset.var["feature_types"] == "Peaks").sum(),
-                                                )
-            except Exception as e:
-                logger.error(f"Something is wrong in MultiVI initialization: {e}")
-                raise
-        else:
-            raise ValueError("MultiVI initialization needs 'feature_types' in variable keys to setup genes (RNA-seq) and genomic regions (ATAC-seq)!")
+        self.model = scvi.model.TOTALVI(self.dataset)
 
     def train(self):
-        logger.info("Training MultiVI Model")
+        logger.info("Training TotalVI Model")
         try:
             self.model.to(self.torch_device)
             self.model.train()
             self.dataset.obsm[self.latent_key] = self.model.get_latent_representation()
-            logger.info(f"Multivi training completed.")
+            logger.info(f"TotalVI training completed.")
         except Exception as e:
             logger.error(f"Error during training: {e}")
             raise
@@ -82,7 +65,7 @@ class MultiVIModel(ModelFactory):
             logger.info("Saving latent data")
             self.dataset.obs["batch"] = "batch_1"
             self.dataset.write(self.latent_filepath)
-            logger.info(f"MultiVI model for dataset {self.dataset_name} was saved as {self.latent_filepath}")
+            logger.info(f"TotalVI model for dataset {self.dataset_name} was saved as {self.latent_filepath}")
         except IOError as e:
             logger.error(f"Could not write latent file to {self.latent_filepath}: {e}")
             raise
@@ -125,7 +108,7 @@ class MultiVIModel(ModelFactory):
         super().evaluate_model(label_key=self.umap_color_type)
 
 def main():
-    parser = argparse.ArgumentParser(description="Run MultiVI model")
+    parser = argparse.ArgumentParser(description="Run TotalVI model")
     parser.add_argument("--config_path", type=str, default="/app/config_alldatasets.json", help="Path to the configuration file")
     args = parser.parse_args()
 
@@ -139,22 +122,22 @@ def main():
     try:
         for dataset_name, data_dict in data_concat.items():
             # Instantiate and run model
-            model = MultiVIModel(
+            model = TotalVIModel(
                 dataset=data_dict,
                 dataset_name=dataset_name,
                 config_path=args.config_path,
             )
-            logger.info(f"Running MultiVI model on dataset: {dataset_name}")
+            logger.info(f"Running TotalVI model on dataset: {dataset_name}")
             # Run the model pipeline
             model.train()
             model.save_latent()
             model.umap()
             model.evaluate_model()
 
-            logger.info(f"MultiVI model run for {dataset_name} completed successfully.")
+            logger.info(f"TotalVI model run for {dataset_name} completed successfully.")
 
     except Exception as e:
-        logger.error(f"An error occurred during MultiVI model run: {e}")
+        logger.error(f"An error occurred during TotalVI model run: {e}")
         # Optionally, re-raise the exception to indicate failure to the container runner
         raise
 

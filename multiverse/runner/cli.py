@@ -7,7 +7,7 @@ logger = get_logger(__name__)
 
 def main():
     parser = argparse.ArgumentParser(description="Run multiverse models in Docker containers")
-    parser.add_argument("--models", nargs="+", required=True, help="List of models to run (e.g., pca mofa multivi)")
+    parser.add_argument("--models", nargs="+", required=True, help="List of models to run (e.g., pca mofa multivi totalvi)")
     parser.add_argument("--input", required=True, help="Path to the input data directory")
     parser.add_argument("--output", required=True, help="Path to the output results directory")
     args = parser.parse_args()

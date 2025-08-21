@@ -1,5 +1,8 @@
 import numpy as np
 import os
+import json
+import pandas as pd
+import scib_metrics
 from ..config import load_config
 from ..logging_utils import get_logger
 
@@ -46,6 +49,10 @@ class ModelFactory:
         self.is_grid_search = is_gridsearch  # Flag for grid search runs
         os.makedirs(self.output_dir, exist_ok=True)
         self.latent_key = f"X_{self.model_name}"
+        if self.model_name in self.model_params:
+            model_specific_params = self.model_params.get(self.model_name)
+            self.umap_color_type = model_specific_params.get("umap_color_type")
+
 
     """def update_output_dir(self):
         if self.is_grid_search:
@@ -88,5 +95,38 @@ class ModelFactory:
     def umap(self):
         logger.info("Create umap for presentation.")
 
-    def evaluate_model(self):
-        logger.info("Write evaluation metrics for this specific model for gridsearch")
+    def evaluate_model(self, batch_key="batch", label_key="cell_type"):
+        """
+        Evaluate the model using scib-metrics.
+        """
+        logger.info("Evaluating model with scib-metrics.")
+
+        if self.latent_key not in self.dataset.obsm:
+            raise ValueError(f"Latent representation '{self.latent_key}' not found in dataset.")
+
+        if batch_key not in self.dataset.obs.columns:
+            logger.warning(f"Batch key '{batch_key}' not found in .obs, creating a dummy batch.")
+            self.dataset.obs[batch_key] = "batch_1"
+
+        if label_key not in self.dataset.obs.columns:
+            logger.warning(f"Label key '{label_key}' not found in .obs, skipping metrics that require it.")
+            label_key = None
+
+        bm = scib_metrics.benchmark.Benchmarker(
+            self.dataset,
+            batch_key=batch_key,
+            label_key=label_key,
+            embedding_obsm_keys=[self.latent_key],
+        )
+
+        bm.benchmark()
+        results_df = bm.get_results(min_max_scale=False)
+        results_dict = results_df.to_dict()
+
+        try:
+            with open(self.metrics_filepath, "w") as f:
+                json.dump(results_dict, f, indent=4)
+            logger.info(f"Metrics saved to {self.metrics_filepath}")
+        except IOError as e:
+            logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
+            raise

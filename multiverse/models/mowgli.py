@@ -114,20 +114,7 @@ class MowgliModel(ModelFactory):
             raise
 
     def evaluate_model(self):
-        if hasattr(self, "loss"):
-            logger.info(f"Optimal Transport Loss (Mowgli): {self.loss}")
-            metrics = {"ot_loss": -self.loss}
-            try:
-                with open(
-                    self.metrics_filepath,
-                    "w",
-                ) as f:
-                    json.dump(metrics, f, indent=4)
-            except IOError as e:
-                logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
-                raise
-        else:
-            raise ValueError("Loss not available in the model.")
+        super().evaluate_model(label_key=self.umap_color_type)
 
 
 def main():
