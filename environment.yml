@@ -4,15 +4,5 @@ channels:
   - defaults
 dependencies:
   - pip
-  - ipykernel
-  - python
-  - pytorch
-  - scvi-tools==1.2.0
-  - scanpy==1.10.3
   - pip:
-    - mofapy2==0.7.2
-    - mowgli==0.1.0
-    - scib==1.1.5
-    - muon==0.1.7
-    - jaxlib==0.4.34
-    - louvain==0.8.2
+    - docker>=6.1.3

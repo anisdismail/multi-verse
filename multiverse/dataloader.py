@@ -5,10 +5,7 @@ import mudata as md
 import muon as mu
 import os
 import numpy as np
-from config import load_config
-from typing import List
-import json
-
+from .config import load_config
 #Output type = anndata, mudata
 
 class DataLoader:
@@ -104,68 +101,6 @@ class DataLoader:
             raise ValueError("file_path must be provided to read mudata files")
         
         self.data = mudata
-        return self.data
-
-    def fuse_mudata(self, list_anndata: List[ad.AnnData] = None, list_modality: List[str] = None) -> md.MuData:
-        """
-        Fusing paired anndata as MuData
-        intersect_obs will be used if number of obs not equivalent
-        Args:
-            list_modality: A list of strings representing the modalities (e.g., ["rna", "atac", "adt"]).
-            list_anndata: A list of AnnData objects corresponding to the modalities (e.g., [adata_rna, adata_atac, adata_adt]).
-        Returns:s
-            A mudata.MuData object    
-        """
-        if len(list_modality) != len(list_anndata):
-            raise ValueError("Length of list_modality and list_anndata must be equal!")
-        else:
-            data_dict = {}
-            for i, mod in enumerate(list_modality):
-                data_dict[mod] = list_anndata[i]
-                try:
-                    list_anndata[i].X = np.array(list_anndata[i].X.todense())
-                except:
-                    pass
-                    
-        self.data = mu.MuData(data_dict)
-        mu.pp.intersect_obs(self.data)   # Make sure number of cells are the same for all modalities
-
-        # Hard-code "cell_type" to avoid conflict
-        if "cell_type" in self.data["rna"].obs.columns:
-            self.data.obs["cell_type"] = self.data["rna"].obs["cell_type"]
-        else:
-            # If there is no 'cell_type' annotation in rna modality
-            print("No annotation -> setting annotation as 'cell_type' = 0 to avoid conflicts.")
-            num_obs = self.data.n_obs
-            self.data.obs["cell_type"] = np.zeros(num_obs, dtype=int)
-        
-        return self.data
-
-    def anndata_concatenate(self, list_anndata: List[ad.AnnData] = None, list_modality: List[str] = None) -> ad.AnnData:
-        """
-        Args:
-            list_modality: A list of strings representing the modalities (e.g., ["rna", "atac", "adt"]).
-            list_anndata: A list of AnnData objects corresponding to the modalities (e.g., [adata_rna, adata_atac, adata_adt]).
-        Returns:s
-            A AnnData object
-        """
-        mudata = self.fuse_mudata(list_anndata=list_anndata, list_modality=list_modality)
-        list_ann = []
-        for mod in list_modality:
-            list_ann.append(mudata[mod])
-
-        anndata = ad.concat(list_ann, axis="var", label="cell_type", merge="unique", uns_merge="unique")
-
-        # Hard-code "cell_type" to avoid conflict (Should already be available when fuse_mudata is called above)
-        num_obs = anndata.n_obs
-        if "cell_type" in mudata.obs.columns:
-            anndata.obs["cell_type"] = mudata.obs["cell_type"]
-        else:
-            # No annotation -> setting annotation as 'cell_type' = 0 to avoid conflicts.
-            anndata.obs["cell_type"] = np.zeros(num_obs, dtype=int)
-        
-        anndata.obs["modality"] = np.zeros(num_obs, dtype=int) # Adding this to prevent error in multiVI model
-        self.data = anndata
         return self.data
 
     def preprocessing(self) -> ad.AnnData:
