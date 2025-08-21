@@ -12,6 +12,7 @@ def main():
     parser.add_argument("--output", required=True, help="Path to the output results directory")
     args = parser.parse_args()
 
+    os.makedirs(args.output, exist_ok=True)
     setup_logging(args.output)
     logger.info(f"Running models: {args.models}")
     logger.info(f"Input directory: {args.input}")
