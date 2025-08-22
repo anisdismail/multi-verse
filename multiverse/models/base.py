@@ -121,12 +121,6 @@ class ModelFactory:
 
         bm.benchmark()
         results_df = bm.get_results(min_max_scale=False)
-        results_dict = results_df.to_dict()
-
-        try:
-            with open(self.metrics_filepath, "w") as f:
-                json.dump(results_dict, f, indent=4)
-            logger.info(f"Metrics saved to {self.metrics_filepath}")
-        except IOError as e:
-            logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
-            raise
+        if not results_df.empty:
+            return results_df.to_dict('records')[0]
+        return {}

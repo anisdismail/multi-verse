@@ -110,7 +110,24 @@ class PCAModel(ModelFactory):
         """
         Evaluate the trained PCA model based on variance explained.
         """
-        super().evaluate_model(label_key=self.umap_color_type)
+        metrics = {}
+        if hasattr(self, "variance_ratio"):
+            total_variance = sum(self.variance_ratio)
+            logger.info(f"Total Variance Explained: {total_variance}")
+            metrics["total_variance"] = str(total_variance)
+        else:
+            logger.warning("PCA variance ratio not available in the model.")
+
+        scib_metrics = super().evaluate_model(label_key=self.umap_color_type)
+        metrics.update(scib_metrics)
+
+        try:
+            with open(self.metrics_filepath, "w") as f:
+                json.dump(metrics, f, indent=4)
+            logger.info(f"Metrics saved to {self.metrics_filepath}")
+        except IOError as e:
+            logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
+            raise
 
 
 def main():

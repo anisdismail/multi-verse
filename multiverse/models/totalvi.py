@@ -105,7 +105,14 @@ class TotalVIModel(ModelFactory):
             raise
 
     def evaluate_model(self):
-        super().evaluate_model(label_key=self.umap_color_type)
+        metrics = super().evaluate_model(label_key=self.umap_color_type)
+        try:
+            with open(self.metrics_filepath, "w") as f:
+                json.dump(metrics, f, indent=4)
+            logger.info(f"Metrics saved to {self.metrics_filepath}")
+        except IOError as e:
+            logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
+            raise
 
 def main():
     parser = argparse.ArgumentParser(description="Run TotalVI model")

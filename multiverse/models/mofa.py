@@ -69,11 +69,60 @@ class MOFAModel(ModelFactory):
             logger.error(f"Error during training: {e}")
             raise
     
+    def _compute_explained_variance(self):
+        """
+        Compute explained variance for MOFA factors.
+        """
+        try:
+            factors = self.dataset.obsm[self.latent_key]  # Extract latent factors
+            # logger.debug(f"Latent factors (X_mofa) shape: {factors.shape}")
+
+            # Compute total variance from raw data across modalities
+            total_variance = 0
+            for modality in self.dataset.mod.values():
+                if hasattr(modality.X, "toarray"):
+                    modality_data = (
+                        modality.X.toarray()
+                    )  # Convert sparse to dense if needed
+                else:
+                    modality_data = modality.X
+                total_variance += np.var(modality_data, axis=0).sum()
+
+            # logger.debug(f"Total variance from all modalities: {total_variance}")
+
+            # Variance explained by factors
+            factor_variances = np.var(factors, axis=0)
+            # logger.debug(f"Factor variances: {factor_variances}")
+
+            explained_variance_ratio = factor_variances / total_variance
+            # logger.debug(f"Explained variance ratio per factor: {explained_variance_ratio}")
+            return explained_variance_ratio
+
+        except Exception as e:
+            logger.error(f"Error computing explained variance: {e}")
+            return []
     def evaluate_model(self):
         """
         Evaluate the trained MOFA+ model based on explained variance.
         """
-        super().evaluate_model(label_key=self.umap_color_type)
+        metrics = {}
+        if hasattr(self, "explained_variance"):
+            total_variance = sum(self.explained_variance)
+            logger.info(f"Total Explained Variance (MOFA+): {total_variance}")
+            metrics["total_variance"] = total_variance
+        else:
+            logger.warning("Explained variance not available for MOFA+.")
+
+        scib_metrics = super().evaluate_model(label_key=self.umap_color_type)
+        metrics.update(scib_metrics)
+
+        try:
+            with open(self.metrics_filepath, "w") as f:
+                json.dump(metrics, f, indent=4)
+            logger.info(f"Metrics saved to {self.metrics_filepath}")
+        except IOError as e:
+            logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
+            raise
     
     def save_latent(self):
         if self.latent_filepath is None:

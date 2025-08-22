@@ -122,7 +122,29 @@ class MultiVIModel(ModelFactory):
             raise
 
     def evaluate_model(self):
-        super().evaluate_model(label_key=self.umap_color_type)
+        metrics = {}
+        if self.latent_key in self.dataset.obsm:
+            latent = self.dataset.obsm[self.latent_key]
+            if self.umap_color_type and self.umap_color_type in self.dataset.obs:
+                labels = self.dataset.obs[self.umap_color_type]
+                silhouette = silhouette_score(latent, labels)
+                logger.info(f"Silhouette Score (MultiVI): {silhouette}")
+                metrics["silhouette_score"] = silhouette
+            else:
+                logger.warning("Labels not found for clustering evaluation.")
+        else:
+            logger.warning("Latent representation (X_multivi) not found.")
+
+        scib_metrics = super().evaluate_model(label_key=self.umap_color_type)
+        metrics.update(scib_metrics)
+
+        try:
+            with open(self.metrics_filepath, "w") as f:
+                json.dump(metrics, f, indent=4)
+            logger.info(f"Metrics saved to {self.metrics_filepath}")
+        except IOError as e:
+            logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
+            raise
 
 def main():
     parser = argparse.ArgumentParser(description="Run MultiVI model")
