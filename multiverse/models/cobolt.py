@@ -12,8 +12,7 @@ from cobolt.model import Cobolt
 # We need to adjust the import path to be relative to the multiverse package
 from .base import ModelFactory
 from ..config import load_config
-from ..train import load_datasets
-from ..data_utils import fuse_mudata
+from ..data_utils import fuse_mudata,load_datasets
 from ..logging_utils import get_logger, setup_logging
 from ..utils import get_device
 

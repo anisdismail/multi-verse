@@ -11,9 +11,9 @@ import torch
 # We need to adjust the import path to be relative to the multiverse package
 from .base import ModelFactory
 from ..config import load_config
-from ..train import load_datasets, dataset_select
 from ..logging_utils import get_logger, setup_logging
 from ..utils import get_device
+from ..data_utils import load_datasets, dataset_select
 
 logger = get_logger(__name__)
 

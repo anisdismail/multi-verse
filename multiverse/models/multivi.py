@@ -8,7 +8,7 @@ import pandas as pd
 from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 from ..config import load_config
-from ..train import load_datasets, dataset_select
+from ..data_utils import load_datasets, dataset_select
 from ..logging_utils import get_logger, setup_logging
 from ..utils import get_device
 

@@ -32,6 +32,7 @@ def run_model_container(
         "multivi": "multiverse-multivi",
         "mowgli": "multiverse-mowgli",
         "cobolt": "multiverse-cobolt",
+        "totalvi": "multiverse-totalvi",
     }
     if model_name not in image_map:
         raise ValueError(f"Unknown model name: {model_name}")

@@ -7,8 +7,8 @@ import muon as mu
 import matplotlib.pyplot as plt
 import numpy as np
 from ..config import load_config
-from ..train import load_datasets, dataset_select
 from ..logging_utils import get_logger, setup_logging
+from ..data_utils import load_datasets, dataset_select
 
 from .base import ModelFactory
 
