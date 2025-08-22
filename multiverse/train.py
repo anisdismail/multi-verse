@@ -2,6 +2,9 @@ from .dataloader import DataLoader
 from .data_utils import fuse_mudata, anndata_concatenate
 from .config import load_config
 import os
+from .logging_utils import get_logger
+
+logger = get_logger(__name__)
 
 def load_datasets(config_path):
     """
@@ -57,7 +60,7 @@ def dataset_select(datasets_dict, data_type: str = ""):
     if data_type == "concatenate":  # Process input object for PCA and MultiVI
         concatenate = {}
         for dataset_name, dataset_data in datasets.items():
-            print(f"\n=== Concatenating dataset: {dataset_name} ===")
+            logger.info(f"Concatenating dataset: {dataset_name}")
             modalities = dataset_data["modalities"]
             list_anndata = dataset_data["data"]
             data_concat = anndata_concatenate(
@@ -68,7 +71,7 @@ def dataset_select(datasets_dict, data_type: str = ""):
     elif data_type == "mudata":  # Process input object for MOFA+ and Mowgli
         mudata_input = {}
         for dataset_name, dataset_data in datasets.items():
-            print(f"\n=== Fusing dataset as MuData object: {dataset_name} ===")
+            logger.info(f"Fusing dataset as MuData object: {dataset_name}")
             modalities = dataset_data["modalities"]
             list_anndata = dataset_data["data"]
             data_fuse = fuse_mudata(

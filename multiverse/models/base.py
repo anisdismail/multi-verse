@@ -1,6 +1,9 @@
 import numpy as np
 import os
 from ..config import load_config
+from ..logging_utils import get_logger
+
+logger = get_logger(__name__)
 
 class ModelFactory:
     """
@@ -28,7 +31,6 @@ class ModelFactory:
         )
 
         # Embeddings of the latent space
-        self.latent = np.zeros((2,2))
         self.latent_filepath = os.path.join(
             self.output_dir,
             "embeddings.h5ad",
@@ -43,6 +45,7 @@ class ModelFactory:
         )
         self.is_grid_search = is_gridsearch  # Flag for grid search runs
         os.makedirs(self.output_dir, exist_ok=True)
+        self.latent_key = f"X_{self.model_name}"
 
     """def update_output_dir(self):
         if self.is_grid_search:
@@ -71,22 +74,19 @@ class ModelFactory:
                 setattr(self, key, value)
             else:
                 # Handle invalid parameter names if necessary
-                print(f"Warning: Invalid parameter name '{key}'")
-
-    def to(self):
-        print("Setting device for model CPU or GPU.")
+                logger.warning(f"Invalid parameter name '{key}'")
 
     def train(self):
-        print("Training the model.")
+        logger.info("Training the model.")
 
     def save_latent(self):
-        print("Saving latent representation of the model.")
+        logger.info("Saving latent representation of the model.")
 
     def load_latent(self):
-        print("Loading the available latent representation.")
+        logger.info("Loading the available latent representation.")
 
     def umap(self):
-        print("Create umap for presentation.")
+        logger.info("Create umap for presentation.")
 
     def evaluate_model(self):
-        print("Write evaluation metrics for thi specific model for gridsearch")
+        logger.info("Write evaluation metrics for this specific model for gridsearch")
