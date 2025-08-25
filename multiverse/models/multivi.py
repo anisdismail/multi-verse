@@ -5,13 +5,12 @@ import scanpy as sc
 import anndata as ad
 import scvi
 import pandas as pd
-from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
+from sklearn.metrics import silhouette_score
 from ..config import load_config
 from ..data_utils import load_datasets, dataset_select
 from ..logging_utils import get_logger, setup_logging
 from ..utils import get_device
-
 from .base import ModelFactory
 
 logger = get_logger(__name__)
@@ -79,7 +78,6 @@ class MultiVIModel(ModelFactory):
             raise ValueError("latent_filepath is not set. Cannot save latent data.")
         try:
             logger.info("Saving latent data")
-            self.dataset.obs["batch"] = "batch_1"
             self.dataset.write(self.latent_filepath)
             logger.info(f"MultiVI model for dataset {self.dataset_name} was saved as {self.latent_filepath}")
         except IOError as e:

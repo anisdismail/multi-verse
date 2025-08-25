@@ -3,12 +3,8 @@ import os
 import json
 import scanpy as sc
 import anndata as ad
-import mudata as md
 import matplotlib.pyplot as plt
 import mowgli
-import torch
-
-# We need to adjust the import path to be relative to the multiverse package
 from .base import ModelFactory
 from ..config import load_config
 from ..logging_utils import get_logger, setup_logging

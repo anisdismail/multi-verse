@@ -158,7 +158,6 @@ class MOFAModel(ModelFactory):
             raise ValueError("latent_filepath is not set. Cannot save latent data.")
         try:
             logger.info("Saving latent data")
-            self.dataset.obs["batch"] = "batch_1"
             self.dataset.write(self.latent_filepath)
             logger.info(f"MOFA model for dataset {self.dataset_name} was saved as {self.latent_filepath}")
         except IOError as e:

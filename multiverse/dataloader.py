@@ -50,7 +50,7 @@ class DataLoader:
             elif ".h5mu" in self.file_path:
                 mudata = mu.read_h5mu(self.file_path)
                 adata = mudata[self.modality]
-                # This is hard-code for Prostate data, not to loss batch information in the metadata
+                # TODO: This is hard-code for Prostate data, not to loss batch information in the metadata
                 adata.obs["batch"] = mudata.obs["batch"]
                 adata.obs["mod_id"] = mudata.obs["mod_id"]
             elif ".h5" in self.file_path:

@@ -1,22 +1,20 @@
 import argparse
-import argparse
 import os
 import json
 import scanpy as sc
 import anndata as ad
 import matplotlib.pyplot as plt
-import torch
 from cobolt.utils import SingleData, MultiomicDataset
 from cobolt.model import Cobolt
 
-# We need to adjust the import path to be relative to the multiverse package
 from .base import ModelFactory
 from ..config import load_config
-from ..data_utils import fuse_mudata,load_datasets
+from ..data_utils import anndata_concatenate, load_datasets
 from ..logging_utils import get_logger, setup_logging
 from ..utils import get_device
 
 logger = get_logger(__name__)
+
 
 class CoboltModel(ModelFactory):
     """Cobolt model implementation."""
@@ -60,9 +58,11 @@ class CoboltModel(ModelFactory):
                     barcode=adata.obs_names.to_numpy(),
                 )
             )
-            
-        self.multiomic_dataset = MultiomicDataset.from_singledata(*self.single_data_list)
-        
+
+        self.multiomic_dataset = MultiomicDataset.from_singledata(
+            *self.single_data_list
+        )
+
         self.model = Cobolt(
             dataset=self.multiomic_dataset,
             n_latent=self.latent_dimensions,
@@ -71,8 +71,8 @@ class CoboltModel(ModelFactory):
         )
 
         logger.info(f"Cobolt model initiated with {self.latent_dimensions} dimension.")
-        
-        self.dataset = fuse_mudata(
+
+        self.dataset = anndata_concatenate(
             list_anndata=self.dataset["data"], list_modality=self.dataset["modalities"]
         )
 
