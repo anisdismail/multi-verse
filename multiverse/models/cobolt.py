@@ -1,23 +1,17 @@
 import argparse
-import argparse
 import os
 import json
-import scanpy as sc
-import anndata as ad
-import matplotlib.pyplot as plt
-import torch
 from cobolt.utils import SingleData, MultiomicDataset
 from cobolt.model import Cobolt
 
-# We need to adjust the import path to be relative to the multiverse package
 from .base import ModelFactory
 from ..config import load_config
-from ..train import load_datasets
-from ..data_utils import fuse_mudata
+from ..data_utils import anndata_concatenate, load_datasets
 from ..logging_utils import get_logger, setup_logging
 from ..utils import get_device
 
 logger = get_logger(__name__)
+
 
 class CoboltModel(ModelFactory):
     """Cobolt model implementation."""
@@ -61,9 +55,11 @@ class CoboltModel(ModelFactory):
                     barcode=adata.obs_names.to_numpy(),
                 )
             )
-            
-        self.multiomic_dataset = MultiomicDataset.from_singledata(*self.single_data_list)
-        
+
+        self.multiomic_dataset = MultiomicDataset.from_singledata(
+            *self.single_data_list
+        )
+
         self.model = Cobolt(
             dataset=self.multiomic_dataset,
             n_latent=self.latent_dimensions,
@@ -72,8 +68,8 @@ class CoboltModel(ModelFactory):
         )
 
         logger.info(f"Cobolt model initiated with {self.latent_dimensions} dimension.")
-        
-        self.dataset = fuse_mudata(
+
+        self.dataset = anndata_concatenate(
             list_anndata=self.dataset["data"], list_modality=self.dataset["modalities"]
         )
 
@@ -94,71 +90,20 @@ class CoboltModel(ModelFactory):
             logger.error(f"Error during training: {e}")
             raise
 
-    def save_latent(self):
-        if self.latent_filepath is None:
-            raise ValueError("latent_filepath is not set. Cannot save latent data.")
-        try:
-            logger.info("Saving latent data")
-            adata = ad.AnnData(self.dataset.obsm[self.latent_key], obs=self.dataset.obs)
-            adata.write(self.latent_filepath)
-            logger.info(f"Latent data saved to {self.latent_filepath}")
-        except IOError as e:
-            logger.error(f"Could not write latent file to {self.latent_filepath}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred while saving latent data: {e}")
-            raise
-
-    def umap(self):
-        """Generate UMAP visualization using Cobolt embeddings for all modalities."""
-        if self.umap_filename is None:
-            raise ValueError("umap_filename is not set. Cannot save UMAP plot.")
-
-        logger.info(f"Generating UMAP with {self.model_name} embeddings for all modalities")
-        try:
-            sc.pp.neighbors(
-                self.dataset, use_rep=self.latent_key, random_state=self.umap_random_state
-            )
-
-            sc.tl.umap(self.dataset, random_state=self.umap_random_state)
-
-            self.dataset.obsm[f"X_{self.model_name}_umap"] = self.dataset.obsm[
-                "X_umap"
-            ].copy()
-
-            if self.umap_color_type in self.dataset.obs:
-                sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
-            else:
-                logger.warning(
-                    f"UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
-                )
-                sc.pl.umap(self.dataset, show=False)
-
-            plt.savefig(self.umap_filename, bbox_inches="tight")
-            plt.close()
-
-            logger.info(
-                f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
-            )
-        except Exception as e:
-            logger.error(f"An error occurred during UMAP generation: {e}")
-            raise
-
     def evaluate_model(self):
+        metrics = {}
         if hasattr(self, "loss"):
             logger.info(f"Cobolt Loss: {self.loss}")
-            metrics = {"loss": self.loss}
-            try:
-                with open(
-                    self.metrics_filepath,
-                    "w",
-                ) as f:
-                    json.dump(metrics, f, indent=4)
-            except IOError as e:
-                logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
-                raise
+            metrics["loss"] = self.loss
         else:
-            raise ValueError("Loss not available in the model.")
+            logger.warning("Loss not available in the model.")
+        try:
+            with open(self.metrics_filepath, "w") as f:
+                json.dump(metrics, f, indent=4)
+            logger.info(f"Metrics saved to {self.metrics_filepath}")
+        except IOError as e:
+            logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
+            raise
 
 
 def main():

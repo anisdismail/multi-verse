@@ -18,9 +18,9 @@ RUN R -e "install.packages('remotes', repos='https://cloud.r-project.org')" \
 WORKDIR /app
 
 COPY multiverse ./multiverse
-COPY docker-env/requirements-pca.txt ./requirements.txt
+COPY docker-env/requirements-evaluation.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY config_alldatasets.json .
 
-ENTRYPOINT ["python", "-m", "multiverse.models.pca", "--config_path", "./config_alldatasets.json"]
+ENTRYPOINT ["python", "-m", "multiverse.evaluate", "--config_path", "./config_alldatasets.json"]

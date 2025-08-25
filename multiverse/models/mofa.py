@@ -1,14 +1,15 @@
 import argparse
 import os
 import json
+import h5py
 import scanpy as sc
 import anndata as ad
 import muon as mu
 import matplotlib.pyplot as plt
 import numpy as np
 from ..config import load_config
-from ..train import load_datasets, dataset_select
 from ..logging_utils import get_logger, setup_logging
+from ..data_utils import load_datasets, dataset_select
 
 from .base import ModelFactory
 
@@ -98,74 +99,61 @@ class MOFAModel(ModelFactory):
         except Exception as e:
             logger.error(f"Error computing explained variance: {e}")
             return []
+    def _compute_explained_variance(self):
+        """
+        Compute explained variance for MOFA factors.
+        """
+        try:
+            factors = self.dataset.obsm[self.latent_key]  # Extract latent factors
+            # logger.debug(f"Latent factors (X_mofa) shape: {factors.shape}")
+
+            # Compute total variance from raw data across modalities
+            total_variance = 0
+            for modality in self.dataset.mod.values():
+                if hasattr(modality.X, "toarray"):
+                    modality_data = (
+                        modality.X.toarray()
+                    )  # Convert sparse to dense if needed
+                else:
+                    modality_data = modality.X
+                total_variance += np.var(modality_data, axis=0).sum()
+
+            # logger.debug(f"Total variance from all modalities: {total_variance}")
+
+            # Variance explained by factors
+            factor_variances = np.var(factors, axis=0)
+            # logger.debug(f"Factor variances: {factor_variances}")
+
+            explained_variance_ratio = factor_variances / total_variance
+            # logger.debug(f"Explained variance ratio per factor: {explained_variance_ratio}")
+            return explained_variance_ratio
+
+        except Exception as e:
+            logger.error(f"Error computing explained variance: {e}")
+            return []
     def evaluate_model(self):
         """
         Evaluate the trained MOFA+ model based on explained variance.
         """
+        metrics = {}
         if hasattr(self, "explained_variance"):
             total_variance = sum(self.explained_variance)
             logger.info(f"Total Explained Variance (MOFA+): {total_variance}")
-            
-            metrics = {"total_variance": total_variance}
-            try:
-                with open(
-                        self.metrics_filepath,
-                        "w",
-                    ) as f:
-                        json.dump(metrics, f, indent=4)
-            except IOError as e:
-                logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
-                raise
+            metrics["total_variance"] = total_variance
         else:
-            raise ValueError("Explained variance not available for MOFA+.")
-    
-    def save_latent(self):
-        if self.latent_filepath is None:
-            raise ValueError("latent_filepath is not set. Cannot save latent data.")
+            logger.warning("Explained variance not available for MOFA+.")
+
         try:
-            logger.info("Saving latent data")
-            self.dataset.obs["batch"] = "batch_1"
-            self.dataset.write(self.latent_filepath)
-            logger.info(f"MOFA model for dataset {self.dataset_name} was saved as {self.latent_filepath}")
+            with open(self.metrics_filepath, "w") as f:
+                json.dump(metrics, f, indent=4)
+            logger.info(f"Metrics saved to {self.metrics_filepath}")
         except IOError as e:
-            logger.error(f"Could not write latent file to {self.latent_filepath}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred while saving latent data: {e}")
-            raise
-
-    def umap(self):
-        if self.umap_filename is None:
-            raise ValueError("umap_filename is not set. Cannot save UMAP plot.")
-
-        logger.info(f"Generating UMAP with {self.model_name} embeddings for all modalities")
-        try:
-            sc.pp.neighbors(
-                self.dataset, use_rep=self.latent_key, random_state=self.umap_random_state
+            logger.error(
+                f"Could not write metrics file to {self.metrics_filepath}: {e}"
             )
-            sc.tl.umap(self.dataset, random_state=self.umap_random_state)
-            self.dataset.obsm[f"X_{self.model_name}_umap"] = self.dataset.obsm[
-                "X_umap"
-            ].copy()
-            if self.umap_color_type in self.dataset.obs:
-                sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
-            else:
-                logger.warning(
-                    f"UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
-                )
-                sc.pl.umap(self.dataset, show=False)
-
-            plt.savefig(self.umap_filename, bbox_inches="tight")
-            plt.close()
-
-            logger.info(
-                f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
-            )
-        except Exception as e:
-            logger.error(f"An error occurred during UMAP generation: {e}")
             raise
 
-    
+
 def main():
     parser = argparse.ArgumentParser(description="Run MOFA model")
     parser.add_argument("--config_path", type=str, default="/app/config_alldatasets.json", help="Path to the configuration file")

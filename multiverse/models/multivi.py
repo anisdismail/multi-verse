@@ -4,14 +4,15 @@ import json
 import scanpy as sc
 import anndata as ad
 import scvi
+import h5py
+import numpy as np
 import pandas as pd
-from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
+from sklearn.metrics import silhouette_score
 from ..config import load_config
-from ..train import load_datasets, dataset_select
+from ..data_utils import load_datasets, dataset_select
 from ..logging_utils import get_logger, setup_logging
 from ..utils import get_device
-
 from .base import ModelFactory
 
 logger = get_logger(__name__)
@@ -74,75 +75,27 @@ class MultiVIModel(ModelFactory):
             logger.error(f"Error during training: {e}")
             raise
 
-    def save_latent(self):
-        if self.latent_filepath is None:
-            raise ValueError("latent_filepath is not set. Cannot save latent data.")
-        try:
-            logger.info("Saving latent data")
-            self.dataset.obs["batch"] = "batch_1"
-            self.dataset.write(self.latent_filepath)
-            logger.info(f"MultiVI model for dataset {self.dataset_name} was saved as {self.latent_filepath}")
-        except IOError as e:
-            logger.error(f"Could not write latent file to {self.latent_filepath}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred while saving latent data: {e}")
-            raise
-
-    def umap(self):
-        if self.umap_filename is None:
-            raise ValueError("umap_filename is not set. Cannot save UMAP plot.")
-
-        logger.info(f"Generating UMAP with {self.model_name} embeddings for all modalities")
-        try:
-            sc.pp.neighbors(
-                self.dataset, use_rep=self.latent_key, random_state=self.umap_random_state
-            )
-            sc.tl.umap(self.dataset, random_state=self.umap_random_state)
-            self.dataset.obsm[f"X_{self.model_name}_umap"] = self.dataset.obsm[
-                "X_umap"
-            ].copy()
-            if self.umap_color_type in self.dataset.obs:
-                sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
-            else:
-                logger.warning(
-                    f"UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
-                )
-                sc.pl.umap(self.dataset, show=False)
-
-            plt.savefig(self.umap_filename, bbox_inches="tight")
-            plt.close()
-
-            logger.info(
-                f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
-            )
-        except Exception as e:
-            logger.error(f"Error generating UMAP: {e}")
-            raise
-
     def evaluate_model(self):
+        metrics = {}
         if self.latent_key in self.dataset.obsm:
             latent = self.dataset.obsm[self.latent_key]
             if self.umap_color_type and self.umap_color_type in self.dataset.obs:
                 labels = self.dataset.obs[self.umap_color_type]
                 silhouette = silhouette_score(latent, labels)
                 logger.info(f"Silhouette Score (MultiVI): {silhouette}")
-                metrics = {"silhouette_score": silhouette}
-                try:
-                    with open(
-                        self.metrics_filepath,
-                        "w",
-                    ) as f:
-                        json.dump(metrics, f, indent=4)
-                except IOError as e:
-                    logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
-                    raise
-
+                metrics["silhouette_score"] = silhouette
             else:
-                logger.warning("Labels not found for clustering evaluation. Returning 0.0")
-                return
+                logger.warning("Labels not found for clustering evaluation.")
         else:
-            raise ValueError("Latent representation (X_multivi) not found.")
+            logger.warning("Latent representation (X_multivi) not found.")
+
+        try:
+            with open(self.metrics_filepath, "w") as f:
+                json.dump(metrics, f, indent=4)
+            logger.info(f"Metrics saved to {self.metrics_filepath}")
+        except IOError as e:
+            logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
+            raise
 
 def main():
     parser = argparse.ArgumentParser(description="Run MultiVI model")
