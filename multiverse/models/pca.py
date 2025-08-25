@@ -3,9 +3,6 @@ import os
 import json
 import scanpy as sc
 import anndata as ad
-import matplotlib.pyplot as plt
-
-# We need to adjust the import path to be relative to the multiverse package
 from .base import ModelFactory
 from ..config import load_config
 from ..data_utils import load_datasets, dataset_select
@@ -60,51 +57,6 @@ class PCAModel(ModelFactory):
         logger.info(f"Training PCA completed with {self.n_components} components")
         logger.info(f"Total variance explained: {sum(self.variance_ratio)}")
 
-    def save_latent(self):
-        """Save the PCA latent representations."""
-        if self.latent_filepath is None:
-            raise ValueError("latent_filepath is not set. Cannot save latent data.")
-
-        logger.info("Saving PCA latent embeddings")
-        try:
-            self.dataset.obs["batch"] = "batch_1"
-            self.dataset.write(self.latent_filepath)
-            logger.info(f"Latent data saved to {self.latent_filepath}")
-        except IOError as e:
-            logger.error(f"Could not write latent file to {self.latent_filepath}: {e}")
-            raise
-
-    def umap(self):
-        """Generate UMAP visualization using PCA embeddings for all modalities."""
-        if self.umap_filename is None:
-            raise ValueError("umap_filename is not set. Cannot save UMAP plot.")
-
-        logger.info("Generating UMAP with PCA embeddings for all modalities")
-        try:
-            sc.pp.neighbors(
-                self.dataset, use_rep=self.latent_key, random_state=self.umap_random_state
-            )
-            sc.tl.umap(self.dataset, random_state=self.umap_random_state)
-
-            self.dataset.obsm["X_pca_umap"] = self.dataset.obsm["X_umap"].copy()
-
-            if self.umap_color_type in self.dataset.obs:
-                sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
-            else:
-                logger.warning(
-                    f"UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
-                )
-                sc.pl.umap(self.dataset, show=False)
-
-            plt.savefig(self.umap_filename, bbox_inches="tight")
-            plt.close()
-
-            logger.info(
-                f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
-            )
-        except Exception as e:
-            logger.error(f"An error occurred during UMAP generation: {e}")
-            raise
 
     def evaluate_model(self):
         """
@@ -114,12 +66,11 @@ class PCAModel(ModelFactory):
         if hasattr(self, "variance_ratio"):
             total_variance = sum(self.variance_ratio)
             logger.info(f"Total Variance Explained: {total_variance}")
-            metrics["total_variance"] = str(total_variance)
+            metrics["total_variance"] = total_variance
         else:
             logger.warning("PCA variance ratio not available in the model.")
 
-        scib_metrics = super().evaluate_model(label_key=self.umap_color_type)
-        metrics.update(scib_metrics)
+        logger.info(f"Evaluation metrics: {metrics}")
 
         try:
             with open(self.metrics_filepath, "w") as f:

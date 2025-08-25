@@ -1,6 +1,7 @@
 import argparse
 import os
 import json
+import h5py
 import scanpy as sc
 import anndata as ad
 import muon as mu
@@ -142,63 +143,17 @@ class MOFAModel(ModelFactory):
         else:
             logger.warning("Explained variance not available for MOFA+.")
 
-        scib_metrics = super().evaluate_model(label_key=self.umap_color_type)
-        metrics.update(scib_metrics)
-
         try:
             with open(self.metrics_filepath, "w") as f:
                 json.dump(metrics, f, indent=4)
             logger.info(f"Metrics saved to {self.metrics_filepath}")
         except IOError as e:
-            logger.error(f"Could not write metrics file to {self.metrics_filepath}: {e}")
-            raise
-    
-    def save_latent(self):
-        if self.latent_filepath is None:
-            raise ValueError("latent_filepath is not set. Cannot save latent data.")
-        try:
-            logger.info("Saving latent data")
-            self.dataset.write(self.latent_filepath)
-            logger.info(f"MOFA model for dataset {self.dataset_name} was saved as {self.latent_filepath}")
-        except IOError as e:
-            logger.error(f"Could not write latent file to {self.latent_filepath}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred while saving latent data: {e}")
-            raise
-
-    def umap(self):
-        if self.umap_filename is None:
-            raise ValueError("umap_filename is not set. Cannot save UMAP plot.")
-
-        logger.info(f"Generating UMAP with {self.model_name} embeddings for all modalities")
-        try:
-            sc.pp.neighbors(
-                self.dataset, use_rep=self.latent_key, random_state=self.umap_random_state
+            logger.error(
+                f"Could not write metrics file to {self.metrics_filepath}: {e}"
             )
-            sc.tl.umap(self.dataset, random_state=self.umap_random_state)
-            self.dataset.obsm[f"X_{self.model_name}_umap"] = self.dataset.obsm[
-                "X_umap"
-            ].copy()
-            if self.umap_color_type in self.dataset.obs:
-                sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
-            else:
-                logger.warning(
-                    f"UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
-                )
-                sc.pl.umap(self.dataset, show=False)
-
-            plt.savefig(self.umap_filename, bbox_inches="tight")
-            plt.close()
-
-            logger.info(
-                f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
-            )
-        except Exception as e:
-            logger.error(f"An error occurred during UMAP generation: {e}")
             raise
 
-    
+
 def main():
     parser = argparse.ArgumentParser(description="Run MOFA model")
     parser.add_argument("--config_path", type=str, default="/app/config_alldatasets.json", help="Path to the configuration file")

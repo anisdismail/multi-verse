@@ -1,12 +1,13 @@
-import numpy as np
 import os
-import json
-import pandas as pd
-import scib_metrics
+import numpy as np
+import scanpy as sc
+import h5py
+import matplotlib.pyplot as plt
 from ..config import load_config
 from ..logging_utils import get_logger
 
 logger = get_logger(__name__)
+
 
 class ModelFactory:
     """
@@ -36,7 +37,7 @@ class ModelFactory:
         # Embeddings of the latent space
         self.latent_filepath = os.path.join(
             self.output_dir,
-            "embeddings.h5ad",
+            "embeddings.h5",
         )
         self.umap_filename = os.path.join(
             self.output_dir,
@@ -57,22 +58,6 @@ class ModelFactory:
             model_specific_params = self.model_params.get(self.model_name)
             self.umap_color_type = model_specific_params.get("umap_color_type")
 
-
-    """def update_output_dir(self):
-        if self.is_grid_search:
-            self.output_dir = os.path.join(self.outdir, "gridsearch_output")
-            self.latent_filepath = os.path.join(
-                self.output_dir,
-                f"{self.model_name}_{self.dataset_name}_gridsearch.h5ad",
-            )
-            self.umap_filename = os.path.join(
-                self.output_dir, f"{self.model_name}_{self.dataset_name}_gridsearch.png"
-            )
-        else:
-            self.output_dir = os.path.join(self.outdir, f"{self.model_name}_output")
-
-        os.makedirs(self.output_dir, exist_ok=True)
-    """
     def update_parameters(self, **kwargs):
         """
         Updates the model parameters.
@@ -91,40 +76,66 @@ class ModelFactory:
         logger.info("Training the model.")
 
     def save_latent(self):
-        logger.info("Saving latent representation of the model.")
+        """
+        Saves only the latent embedding (matrix) to an HDF5 file.
+        """
+        if self.latent_filepath is None:
+            raise ValueError("latent_filepath is not set. Cannot save latent data.")
 
-    def load_latent(self):
-        logger.info("Loading the available latent representation.")
+        latent = self.dataset.obsm[self.latent_key]
+        if not isinstance(latent, np.ndarray):
+            latent = latent.to_numpy()  # handle sparse or dataframe
+
+        try:
+            logger.info("Saving latent embedding matrix")
+            with h5py.File(self.latent_filepath, "w") as f:
+                f.create_dataset("latent", data=latent)
+            logger.info(f"Latent embedding saved to {self.latent_filepath}")
+        except IOError as e:
+            logger.error(f"Could not write latent file to {self.latent_filepath}: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"An unexpected error occurred while saving latent data: {e}")
+            raise
 
     def umap(self):
-        logger.info("Create umap for presentation.")
+        """Generate UMAP visualization using Cobolt embeddings for all modalities."""
+        if self.umap_filename is None:
+            raise ValueError("umap_filename is not set. Cannot save UMAP plot.")
 
-    def evaluate_model(self, batch_key="batch", label_key="cell_type"):
-        """
-        Evaluate the model using scib-metrics.
-        """
-        logger.info("Evaluating model with scib-metrics.")
-
-        if self.latent_key not in self.dataset.obsm:
-            raise ValueError(f"Latent representation '{self.latent_key}' not found in dataset.")
-
-        if batch_key not in self.dataset.obs.columns:
-            logger.warning(f"Batch key '{batch_key}' not found in .obs, creating a dummy batch.")
-            self.dataset.obs[batch_key] = "batch_1"
-
-        if label_key not in self.dataset.obs.columns:
-            logger.warning(f"Label key '{label_key}' not found in .obs, skipping metrics that require it.")
-            label_key = None
-
-        bm = scib_metrics.benchmark.Benchmarker(
-            self.dataset,
-            batch_key=batch_key,
-            label_key=label_key,
-            embedding_obsm_keys=[self.latent_key],
+        logger.info(
+            f"Generating UMAP with {self.model_name} embeddings for all modalities"
         )
+        try:
+            sc.pp.neighbors(
+                self.dataset,
+                use_rep=self.latent_key,
+                random_state=self.umap_random_state,
+            )
 
-        bm.benchmark()
-        results_df = bm.get_results(min_max_scale=False)
-        if not results_df.empty:
-            return results_df.to_dict('records')[0]
-        return {}
+            sc.tl.umap(self.dataset, random_state=self.umap_random_state)
+
+            self.dataset.obsm[f"X_{self.model_name}_umap"] = self.dataset.obsm[
+                "X_umap"
+            ].copy()
+
+            if self.umap_color_type in self.dataset.obs:
+                sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
+            else:
+                logger.warning(
+                    f"UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
+                )
+                sc.pl.umap(self.dataset, show=False)
+
+            plt.savefig(self.umap_filename, bbox_inches="tight")
+            plt.close()
+
+            logger.info(
+                f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
+            )
+        except Exception as e:
+            logger.error(f"An error occurred during UMAP generation: {e}")
+            raise
+
+    def evaluate_model(self):
+        logger.info("Evaluating the model.")

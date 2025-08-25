@@ -1,9 +1,6 @@
 import argparse
 import os
 import json
-import scanpy as sc
-import anndata as ad
-import matplotlib.pyplot as plt
 from cobolt.utils import SingleData, MultiomicDataset
 from cobolt.model import Cobolt
 
@@ -93,56 +90,6 @@ class CoboltModel(ModelFactory):
             logger.error(f"Error during training: {e}")
             raise
 
-    def save_latent(self):
-        if self.latent_filepath is None:
-            raise ValueError("latent_filepath is not set. Cannot save latent data.")
-        try:
-            logger.info("Saving latent data")
-            adata = ad.AnnData(self.dataset.obsm[self.latent_key], obs=self.dataset.obs)
-            adata.write(self.latent_filepath)
-            logger.info(f"Latent data saved to {self.latent_filepath}")
-        except IOError as e:
-            logger.error(f"Could not write latent file to {self.latent_filepath}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred while saving latent data: {e}")
-            raise
-
-    def umap(self):
-        """Generate UMAP visualization using Cobolt embeddings for all modalities."""
-        if self.umap_filename is None:
-            raise ValueError("umap_filename is not set. Cannot save UMAP plot.")
-
-        logger.info(f"Generating UMAP with {self.model_name} embeddings for all modalities")
-        try:
-            sc.pp.neighbors(
-                self.dataset, use_rep=self.latent_key, random_state=self.umap_random_state
-            )
-
-            sc.tl.umap(self.dataset, random_state=self.umap_random_state)
-
-            self.dataset.obsm[f"X_{self.model_name}_umap"] = self.dataset.obsm[
-                "X_umap"
-            ].copy()
-
-            if self.umap_color_type in self.dataset.obs:
-                sc.pl.umap(self.dataset, color=self.umap_color_type, show=False)
-            else:
-                logger.warning(
-                    f"UMAP color key '{self.umap_color_type}' not found in .obs. Plotting without color."
-                )
-                sc.pl.umap(self.dataset, show=False)
-
-            plt.savefig(self.umap_filename, bbox_inches="tight")
-            plt.close()
-
-            logger.info(
-                f"UMAP plot for {self.model_name} {self.dataset_name} saved as {self.umap_filename}"
-            )
-        except Exception as e:
-            logger.error(f"An error occurred during UMAP generation: {e}")
-            raise
-
     def evaluate_model(self):
         metrics = {}
         if hasattr(self, "loss"):
@@ -150,10 +97,6 @@ class CoboltModel(ModelFactory):
             metrics["loss"] = self.loss
         else:
             logger.warning("Loss not available in the model.")
-
-        scib_metrics = super().evaluate_model(label_key=self.umap_color_type)
-        metrics.update(scib_metrics)
-
         try:
             with open(self.metrics_filepath, "w") as f:
                 json.dump(metrics, f, indent=4)
